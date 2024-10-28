@@ -89,3 +89,104 @@ exports.createPaymentIntent = async (req, res) => {
         res.status(400).send({ error: error.message });
     }
 };
+
+
+
+
+
+// const Cart = require('../models/Cart');
+// const Product = require('../models/Product');
+// const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+// exports.createProduct = async (req, res) => {
+//     const { name, price, description, imageUrl, variants } = req.body; // Include variants
+//     console.log('Request Body:', req.body);
+//     try {
+//         const newProduct = new Product({
+//             name,
+//             price,
+//             description,
+//             imageUrl,
+//             variants // Save the variants
+//         });
+
+//         await newProduct.save();
+//         res.status(201).json(newProduct);
+//     } catch (error) {
+//         res.status(400).json({ message: 'Error creating product', error });
+//     }
+// };
+
+// exports.getAllProducts = async (req, res) => {
+//     const products = await Product.find();
+//     res.json(products);
+// };
+
+// exports.addToCart = async (req, res) => {
+//     const { userId, productId, variantIndex, quantity } = req.body; // Added variantIndex to identify the variant
+
+//     try {
+//         // Find the product to check available quantity
+//         const product = await Product.findById(productId);
+
+//         if (!product) {
+//             return res.status(404).json({ message: 'Product not found' });
+//         }
+
+//         // Check if the variant index is valid
+//         if (variantIndex < 0 || variantIndex >= product.variants.length) {
+//             return res.status(400).json({ message: 'Invalid variant' });
+//         }
+
+//         // Check if there is enough quantity in stock for the specific variant
+//         const variant = product.variants[variantIndex];
+//         if (variant.quantity < quantity) {
+//             return res.status(400).json({ message: 'Insufficient quantity in stock for this variant' });
+//         }
+
+//         // Update the variant quantity
+//         variant.quantity -= quantity;
+//         await product.save();
+
+//         // Find or create a cart for the user
+//         let cart = await Cart.findOne({ userId });
+//         if (!cart) {
+//             cart = new Cart({ userId, items: [{ productId, variantIndex, quantity }] });
+//         } else {
+//             // Check if the item is already in the cart
+//             const itemIndex = cart.items.findIndex((item) => item.productId.toString() === productId && item.variantIndex === variantIndex);
+//             if (itemIndex > -1) {
+//                 // Update the quantity if item is already in cart
+//                 cart.items[itemIndex].quantity += quantity;
+//             } else {
+//                 // Add new item to the cart
+//                 cart.items.push({ productId, variantIndex, quantity });
+//             }
+//         }
+
+//         // Save the updated cart
+//         await cart.save();
+//         res.json(cart);
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({ message: 'Error adding to cart', error });
+//     }
+// };
+
+// exports.getCart = async (req, res) => {
+//     const cart = await Cart.findOne({ userId: req.params.userId }).populate('items.productId', 'name price imageUrl variants');
+//     res.json(cart);
+// };
+
+// exports.createPaymentIntent = async (req, res) => {
+//     const { amount } = req.body;
+//     try {
+//         const paymentIntent = await stripe.paymentIntents.create({
+//             amount: amount * 100,
+//             currency: 'usd',
+//         });
+//         res.send({ clientSecret: paymentIntent.client_secret });
+//     } catch (error) {
+//         res.status(400).send({ error: error.message });
+//     }
+// };

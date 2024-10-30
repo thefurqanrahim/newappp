@@ -29,6 +29,44 @@ exports.getAllProducts = async (req, res) => {
     res.json(products);
 };
 
+const HandleGetBestSellers = async (req, res) => {
+    try {
+        const { limit = 10 } = req.query;
+
+        const parsedLimit = parseInt(limit);
+        if (isNaN(parsedLimit) || parsedLimit <= 0) {
+            return res.status(400).json({ message: 'Invalid limit parameter. It must be a positive integer.' });
+        }
+
+        const bestSellers = await ProductModel.find({ status: 'Active' })
+            .sort({ salesCount: -1 })
+            .limit(parsedLimit)
+            .populate({
+                path: 'category',
+                model: 'categories',
+            })
+            .populate({
+                path: 'storeID',
+                model: 'StoreOwner',
+                select: '-password',
+            })
+            .exec();
+
+        if (bestSellers.length === 0) {
+            return res.status(404).json({ message: 'No best-selling products found.' });
+        }
+
+        res.status(200).json(bestSellers);
+    } catch (error) {
+        console.error('Error fetching best sellers:', error);
+        if (error.name === 'MongoError') {
+            return res.status(500).json({ message: 'Database error occurred', error });
+        }
+        res.status(500).json({ message: 'Internal server error', error });
+    }
+};
+
+
 exports.addToCart = async (req, res) => {
     const { userId, productId, quantity } = req.body;
 
@@ -71,6 +109,117 @@ exports.getCart = async (req, res) => {
     const cart = await Cart.findOne({ userId: req.params.userId }).populate('items.productId', 'name price');
     res.json(cart);
 };
+
+//updated function
+
+// const HandleAddToCart = async (req, res) => {
+//     const { userId, productId, stock } = req.body;
+//     const session = await mongoose.startSession();
+//     session.startTransaction();
+//     try {
+//         const product = await Product.findById(productId).session(session);
+
+//         if (!product || stock <= 0 || stock > product.availableStock) {
+//             return res.status(400).json({ message: 'Invalid stock amount or product not available' });
+//         }
+
+//         let cart = await Cart.findOne({ userId }).session(session);
+//         if (!cart) {
+//             cart = new Cart({ userId, items: [{ productId, stock }] });
+//         } else {
+//             const itemIndex = cart.items.findIndex((item) => item.productId.toString() === productId);
+//             if (itemIndex > -1) {
+//                 cart.items[itemIndex].stock += stock;
+//             } else {
+//                 cart.items.push({ productId, stock });
+//             }
+//         }
+
+//         await cart.save();
+//         await session.commitTransaction();
+//         session.endSession();
+//         res.json(cart);
+//     } catch (error) {
+//         await session.abortTransaction();
+//         session.endSession();
+//         res.status(500).json({ message: 'Error adding to cart', error });
+//     }
+// };
+
+// const HandleGetCart = async (req, res) => {
+//     try {
+//         const cart = await Cart.findOne({ userId: req.params.userId }).populate(
+//             'items.productId',
+//             'title discountPrice availableStock productImage'
+//         );
+//         res.json(cart);
+//     } catch (error) {
+//         res.status(500).json({ message: 'Error retrieving cart', error });
+//     }
+// };
+
+
+
+const HandleUpdateCart = async (req, res) => {
+    const { userId } = req.params;
+    const { productId, stock } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(productId) || stock < 0) {
+        return res.status(400).json({ message: 'Invalid userId, productId, or stock value' });
+    }
+
+    try {
+        const cart = await Cart.findOne({ userId });
+        if (!cart) return res.status(404).json({ message: 'Cart not found' });
+
+        const itemIndex = cart.items.findIndex(item => item.productId.toString() === productId);
+
+        if (itemIndex > -1) {
+            if (stock === 0) {
+                cart.items.splice(itemIndex, 1);
+            } else {
+                const product = await Product.findById(productId);
+                if (stock > product.availableStock) return res.status(400).json({ message: 'Insufficient stock' });
+                cart.items[itemIndex].stock = stock;
+            }
+        } else {
+            cart.items.push({ productId, stock });
+        }
+
+        await cart.save();
+        res.json(cart);
+    } catch (error) {
+        res.status(500).json({ message: 'Error updating cart', error });
+    }
+};
+
+const HandleDeleteCartItem = async (req, res) => {
+    const { userId, productId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(productId)) {
+        return res.status(400).json({ message: 'Invalid userId or productId' });
+    }
+
+    try {
+        const cart = await Cart.findOne({ userId });
+        if (!cart) {
+            return res.status(404).json({ message: 'Cart not found' });
+        }
+
+        const itemIndex = cart.items.findIndex(item => item.productId.toString() === productId);
+        if (itemIndex > -1) {
+            cart.items.splice(itemIndex, 1);
+            await cart.save();
+            res.json({ message: 'Product removed from cart', cart });
+        } else {
+            res.status(404).json({ message: 'Product not found in cart' });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error deleting product from cart', error });
+    }
+};
+
 
 exports.addAddress = async (req, res) => {
     const { userId, street, city, state, zipCode, country, phoneNumber, additionalInfo } = req.body;
